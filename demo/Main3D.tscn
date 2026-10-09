@@ -31,6 +31,7 @@ script = ExtResource( 1 )
 show_processed = true
 
 [node name="webcamView" type="TextureRect" parent="."]
+visible = false
 margin_right = 40.0
 margin_bottom = 40.0
 

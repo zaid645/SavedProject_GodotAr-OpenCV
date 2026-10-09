@@ -111,7 +111,32 @@ Tidak ada node yang perlu ditambah manual — kode men-spawn sendiri:
 4. **Kehalusan:** `smooth_factor` 8.0 default; kecilkan bila lag,
    besarkan bila jitter.
 
-## D. Build & Jalankan (terminal, BUKAN dari icon)
+## D2. Aktifkan video background di Main3D (Tahap 2 — tanpa tambah node)
+
+Kode sudah membuat `VideoQuad` otomatis sebagai child `Camera`, jadi TIDAK
+perlu menambah node apa pun. Yang kamu lakukan manual:
+
+1. **Nonaktifkan `webcamView` lama** (node `TextureRect` 40×40 peninggalan):
+   pilih node `webcamView` di `Main3D.tscn` → Inspector → **`Visible = OFF`**.
+   Alasan: elemen Control selalu digambar DI ATAS 3D sehingga kalau dibiarkan
+   menutupi/mengganggu; video sekarang dirender via quad ber-depth benar.
+   (Jangan hapus dulu — biarkan OFF sebagai cadangan debug.)
+2. Pilih root `Main3D` → Inspector → pastikan export baru:
+   - `video_enabled = true`
+   - `video_distance = 1.0`
+   - `capture_width = 640`, `capture_height = 480`
+     (samakan dengan property `width`/`height` di node `ARWorker` bila diubah).
+   - `hold_frames = 12`, `max_jump = 0.15`
+   - `smooth_factor = 8.0`, `smooth_rot = 8.0` (boleh beda: rotasi biasanya
+     butuh smoothing lebih kuat daripada posisi).
+3. Koneksi `frame_updated` ARWorker → `_on_ARWorker_frame_updated` SUDAH ada
+   di scene-mu (baris connection) — biarkan, sekarang handler-nya terisi
+   (mengisi texture + membuat quad). Tidak perlu koneksi baru.
+4. `Camera.fov` akan diset otomatis oleh `_sync_camera_fov()` (~45° untuk
+   640×480 agar cocok dengan `fx` OpenCV). Jangan paksa 60° lagi.
+5. Save scene.
+
+## E. Cara Mengecek (apakah dari scene yang kamu buat)
 
 ```bash
 cd /home/linuxlite/000_ZFile_000/GodotProject/ArTest/godot-cpp-opencv
@@ -135,6 +160,10 @@ Urutan yang diharapkan (ikuti berurutan, berhenti di yang gagal):
 | E5 | Run `Main3D` + arahkan marker | Model muncul + ikut miring, status `ID [7] \| miring N°` | Cek koneksi sinyal C.7 + `ARWorker` visible off tapi **enabled**, `marker_length` 0.05; bila tak miring, `.gd` belum tersimpan/ter-reload |
 | E5b | 2+ marker ID beda bersamaan | Tiap ID kubus sendiri warna unik; yang hilang → kubusnya hilang | Bila semua kubus sama: normal sebelum `.glb` diisi (fallback). Bila hanya 1 tampil: cek `target_id` = -1 |
 | E6 | Gerak halus | Tidak bergetar liar (`smooth_factor` 8.0, slerp rotasi) | Wajar goyang sebelum kalibrasi. Kecilkan `smooth_factor` bila lag, besarkan bila jitter |
+| E6b | Stabilisasi (Tahap 1) | Tutup marker ~0,3 dtk → kubus DIAM + status `tahan N`; tutup > ~0,5 dtk (12 frame) → hilang normal | Bila langsung hilang: `hold_frames` kekecilan → naikkan ke 20. Bila kubus teleport saat goyang: `max_jump` kekecilan → naikkan ke 0.25 |
+| E7 | Video background (Tahap 2) | Run `Main3D` → terlihat GAMBAR WEBCAM (bukan abu-abu) + kubus menempel di atas marker, persis framing `Main2D` | Layar hitam: `video_enabled` false / handler belum terisi (reload `.gd`). Kubus di bawah video: `webcamView` lama masih visible → OFF-kan (D2.1). Kubus meleset dari marker: `Camera.fov` dipaksa manual → biarkan kode yang set; cek `capture_width/height` cocok dgn ARWorker |
+
+## D. Build & Jalankan (terminal, BUKAN dari icon — C++ tak berubah tahap ini)
 
 Tips marker-dari-layar: kunci brightness maksimal, matikan True-Tone/Night-Light,
 perbesar marker hingga ~1/4 tinggi layar, hindari pantulan lampu (miringkan HP
@@ -149,3 +178,8 @@ perbesar marker hingga ~1/4 tinggi layar, hindari pantulan lampu (miringkan HP
   besar belum diuji — mulai dari `.glb` kecil dulu.
 - Batasan multi-marker menjawab pertanyaanmu: deteksi TIDAK dibatasi 1 marker
   (semua ID dikirim C++); yang tampil hanya yang lolos `target_id` + punya node.
+- Sinkron FOV (~45°) dari `fx` perkiraan — belum pixel-perfect sebelum kalibrasi
+  papan catur; kubus bisa meleset beberapa px di tepi layar.
+- `VideoQuad` dibuat dari kode sebagai child `Camera`. Catatan Godot 3:
+  bila `Camera.keep_aspect` bukan Keep Height/Width, video bisa stretch saat
+  window di-resize — samakan aspek window 640×480 dulu.

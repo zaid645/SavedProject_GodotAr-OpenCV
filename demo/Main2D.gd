@@ -10,7 +10,7 @@ func _ready() -> void:
 
 	# Paksa deteksi aktif walau properti show_processed di .tscn lupa dicentang (G1).
 	if has_node("Sprite"):
-		$Sprite.set_show_processed(true)
+		$Sprite.show_processed = true
 
 	_set_status("Menunggu marker DICT_4X4_50...")
 

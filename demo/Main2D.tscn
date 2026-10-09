@@ -13,7 +13,15 @@ margin_right = 640.0
 margin_bottom = 480.0
 expand = true
 
+[node name="StatusLabel" type="Label" parent="webcamView"]
+margin_right = 40.0
+margin_bottom = 14.0
+text = "status"
+
 [node name="Sprite" type="Sprite" parent="."]
+visible = false
 script = ExtResource( 1 )
+show_processed = true
 
 [connection signal="frame_updated" from="Sprite" to="." method="_on_Sprite_frame_updated"]
+[connection signal="marker_detected" from="Sprite" to="." method="_on_Sprite_marker_detected"]

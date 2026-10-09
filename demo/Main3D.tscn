@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://bin/gd_opencv.gdns" type="Script" id=1]
+[ext_resource path="res://MainAR.gd" type="Script" id=2]
+
+[sub_resource type="CubeMesh" id=1]
+size = Vector3( 0.05, 0.05, 0.05 )
+
+[sub_resource type="SpatialMaterial" id=2]
+albedo_color = Color( 1, 0.968627, 0, 1 )
+emission_enabled = true
+emission = Color( 0.984314, 0.768627, 0.0588235, 1 )
+emission_energy = 8.3
+emission_operator = 0
+emission_on_uv2 = false
+
+[node name="Main3D" type="Spatial"]
+script = ExtResource( 2 )
+
+[node name="Camera" type="Camera" parent="."]
+keep_aspect = 0
+fov = 60.0
+
+[node name="Cube" type="MeshInstance" parent="."]
+mesh = SubResource( 1 )
+material/0 = SubResource( 2 )
+
+[node name="ARWorker" type="Sprite" parent="."]
+visible = false
+script = ExtResource( 1 )
+show_processed = true
+
+[node name="StatusLabel" type="Label" parent="ARWorker"]
+margin_right = 40.0
+margin_bottom = 14.0
+
+[node name="webcamView" type="TextureRect" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[connection signal="frame_updated" from="ARWorker" to="." method="_on_ARWorker_frame_updated"]
+[connection signal="marker_detected" from="ARWorker" to="." method="_on_ARWorker_marker_detected"]

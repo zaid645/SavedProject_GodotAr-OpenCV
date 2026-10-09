@@ -65,3 +65,7 @@ func _set_status(text: String) -> void:
 		$StatusLabel.text = text
 	else:
 		print("[MainAR] ", text)
+
+
+func _on_ARWorker_frame_updated(node, image):
+	pass # Replace with function body.

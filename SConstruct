@@ -21,8 +21,8 @@ cpp_bindings_path = "godot-cpp/"
 cpp_library = "libgodot-cpp"
 
 # opencv include and libs from pkg-config
-opencv_include = os.popen("echo `pkg-config --cflags opencv`").read().split()
-opencv_libs = os.popen("echo `pkg-config --libs opencv`").read().split()
+opencv_include = os.popen("echo `pkg-config --cflags opencv4`").read().split()
+opencv_libs = os.popen("echo `pkg-config --libs opencv4`").read().split()
 # print([p[2:] for p in opencv_include]); exit()
 # print([opencv_libs[0][2:]]); exit()
 # print([p[2:] for p in opencv_libs[1:]]); exit()

@@ -1,0 +1,24 @@
+# Build GDNative (hasil scons — bisa dibangun ulang)
+demo/bin/x11/*.so
+demo/bin/win64/*.dll
+demo/bin/osx/*.dylib
+*.os
+*.o
+*.obj
+.scons*
+sconsign.dblite
+
+# godot-cpp yang dibuild lokal
+godot-cpp/bin/
+
+# File lokal editor Godot (jangan ikut commit)
+.godot/
+*.import
+*.translation
+*.godot.tmp
+
+# Log & file sementara editor/OS
+*.log
+*~
+.DS_Store
+Thumbs.db

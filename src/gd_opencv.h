@@ -21,12 +21,15 @@ namespace godot
             int width;
             int height;
             bool show_processed;
+            float marker_length;
 
             cv::VideoCapture *cap;
             cv::Mat frame;
             cv::Mat output;
             Ref<Image> gd_frame;
             OpenCVProcessing *own_opencv_code_object;
+
+            void emit_marker_signal();
 
         public:
             static void _register_methods();
@@ -48,6 +51,10 @@ namespace godot
             // to select processed/unprocessed image for display
             void set_show_processed(bool do_process);
             bool get_show_processed();
+
+            // marker fisik (meter) untuk estimasi pose
+            void set_marker_length(float meters);
+            float get_marker_length();
     };
 }
 

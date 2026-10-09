@@ -1,23 +1,42 @@
 extends Control
+# Debug video 2D: tampilkan frame webcam + paksa deteksi aktif.
+# Catatan: .tscn TIDAK diubah (sesuai batasan) — semua diamankan via kode.
+
+var _tex: ImageTexture
 
 
-# Declare member variables here. Examples:
-# var a = 2
-# var b = "text"
+func _ready() -> void:
+	_tex = ImageTexture.new()
+
+	# Paksa deteksi aktif walau properti show_processed di .tscn lupa dicentang (G1).
+	if has_node("Sprite"):
+		$Sprite.set_show_processed(true)
+
+	_set_status("Menunggu marker DICT_4X4_50...")
 
 
-# Called when the node enters the scene tree for the first time.
-func _ready():
-	pass # Replace with function body.
+func _on_Sprite_frame_updated(_node, image) -> void:
+	# Reuse SATU texture, jangan ImageTexture.new() tiap frame (G2).
+	if image == null:
+		return
+	_tex.create_from_image(image)
+	if has_node("webcamView"):
+		$webcamView.texture = _tex
 
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-#func _process(delta):
-#	pass
+func _on_Sprite_marker_detected(_node, ids: Array, _translations: Array, _rotations: Array) -> void:
+	# Status ringan untuk debug 2D. Untuk AR 3D pakai MainAR.gd.
+	if ids.empty():
+		_set_status("Menunggu marker DICT_4X4_50...")
+	else:
+		_set_status("Marker ID: %s" % str(ids[0]))
 
 
-func _on_Sprite_frame_updated(node, image):
-	# pass # Replace with function body.
-	var image_texture:ImageTexture = ImageTexture.new()
-	image_texture.create_from_image(image)
-	$webcamView.texture = image_texture
+func _set_status(text: String) -> void:
+	# Guard: StatusLabel dibuat manual via scene_implementation.md (G5).
+	# Tanpa guard ini game crash bila label belum ada.
+	if has_node("StatusLabel"):
+		$StatusLabel.text = text
+	else:
+		print("[Main2D] ", text)
+

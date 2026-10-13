@@ -143,12 +143,14 @@ func has_marker(id: int = -1) -> bool:
 	return last_ids.has(id)
 
 
-func get_index(id: int) -> int:
+func get_marker_index(id: int) -> int:
+	# Catatan: JANGAN pakai nama `get_index` — itu method bawaan Node di Godot 3
+	# (mengembalikan urutan child). Bentrok signature -> error 146 di editor.
 	return last_ids.find(id)
 
 
 func get_marker_position(id: int) -> Vector3:
-	var i := get_index(id) if id >= 0 else 0
+	var i := get_marker_index(id) if id >= 0 else 0
 	if i < 0 or i >= last_translations.size():
 		return Vector3.ZERO
 	var t: Vector3 = last_translations[i]
@@ -156,7 +158,7 @@ func get_marker_position(id: int) -> Vector3:
 
 
 func get_marker_basis(id: int) -> Basis:
-	var i := get_index(id) if id >= 0 else 0
+	var i := get_marker_index(id) if id >= 0 else 0
 	if i < 0 or i >= last_rotations.size():
 		return Basis()
 	return basis_from_rvec(last_rotations[i])

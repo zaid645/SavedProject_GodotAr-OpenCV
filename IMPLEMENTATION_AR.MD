@@ -48,10 +48,16 @@ Konfigurasi default di `ARSession` (bisa diubah dari Inspector):
 
 Fungsi penting: `start()` / `stop()` / `is_running()`,
 `set_camera_id(n)`, `set_show_processed(v)`, `set_marker_length(m)`,
-`get_video_texture()`, `has_marker(id)`,
+`get_video_texture()`, `has_marker(id)`, `get_marker_index(id)`,
 `get_marker_position(id)` (sudah konversi sumbu OpenCV→Godot),
 `get_marker_basis(id)`, `get_marker_tilt_deg(id)`,
 `status_text()`, `basis_from_rvec(r)` (static).
+
+> Peringatan penamaan: JANGAN membuat fungsi bernama `get_index()`, `get_name()`,
+> `get_class()`, dll. Itu method bawaan `Node`/`Object` — kalau ditimpa dengan
+> signature berbeda, editor menampilkan
+> `error 146: The function signature doesn't match the parent.`
+> Pakai awalan khusus, mis. `get_marker_index()`.
 
 Aturan ID: `id = -1` = "marker pertama / apa saja";
 `id >= 0` = ID ArUco spesifik (untuk multi-model).

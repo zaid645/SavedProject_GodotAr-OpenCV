@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://global/ar_marker_spawner.gd" type="Script" id=1]
+[ext_resource path="res://global/ar.gd" type="Script" id=2]
+
+[node name="try1" type="Spatial"]
+
+[node name="Camera" type="Camera" parent="."]
+
+[node name="ARMarkerSpawner" type="Spatial" parent="."]
+script = ExtResource( 1 )
+session_node = NodePath("../ARSession")
+
+[node name="ARSession" type="Node" parent="."]
+script = ExtResource( 2 )

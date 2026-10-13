@@ -67,14 +67,16 @@ func _find_or_create_session() -> void:
 		add_child(_session)
 
 
+
 func _find_session_recursive(n: Node) -> ARSession:
 	if n is ARSession:
-		return n
+		return n as ARSession
 	for c in n.get_children():
-		var f := _find_session_recursive(c)
+		var f: ARSession = _find_session_recursive(c)
 		if f != null:
 			return f
 	return null
+
 
 
 func _on_markers(_node, ids: Array, translations: Array, rotations: Array) -> void:
@@ -131,7 +133,7 @@ func _ensure_instance(id: int) -> Spatial:
 
 func _make_cube(id: int) -> MeshInstance:
 	var mi := MeshInstance.new()
-	var box := BoxMesh.new()
+	var box := CubeMesh.new()
 	box.size = Vector3(marker_length, marker_length, marker_length)
 	mi.mesh = box
 	var mat := SpatialMaterial.new()
@@ -176,3 +178,19 @@ func _set_status(text: String) -> void:
 		var lbl := get_node_or_null(status_label_path)
 		if lbl != null and "text" in lbl:
 			lbl.text = text
+
+
+# --- API pemetaan (agar tak perlu edit Dictionary manual di Inspector) -----
+# marker_map tetap export var per-node: tiap scene/instance punya isi sendiri.
+# Tambah dari kode bila scene AR baru butuh pasangan ID->scene berbeda.
+func add_marker(id: int, scene: PackedScene) -> void:
+	if scene != null:
+		marker_map[id] = scene
+
+
+func clear_markers() -> void:
+	marker_map.clear()
+
+
+func marker_ids() -> Array:
+	return marker_map.keys()

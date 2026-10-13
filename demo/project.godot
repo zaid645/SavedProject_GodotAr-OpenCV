@@ -8,6 +8,22 @@
 
 config_version=4
 
+_global_script_classes=[ {
+"base": "Spatial",
+"class": "ARMarkerSpawner",
+"language": "GDScript",
+"path": "res://global/ar_marker_spawner.gd"
+}, {
+"base": "Node",
+"class": "ARSession",
+"language": "GDScript",
+"path": "res://global/ar.gd"
+} ]
+_global_script_class_icons={
+"ARMarkerSpawner": "",
+"ARSession": ""
+}
+
 [application]
 
 config/name="Godot CPP OpenCV"

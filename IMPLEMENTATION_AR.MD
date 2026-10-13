@@ -91,21 +91,38 @@ Ya — ArUco memang "berisi ID" (DICT_4X4_50 = ID 0–49). Node `ARSpawner`
 memetakan **ID → scene objek**, persis seperti yang kamu bayangkan.
 
 
+### 3a. Yang ARSession buat OTOMATIS (tanpa setup manual)
+
+| Node | Export pengatur | Bila dinonaktifkan |
+|---|---|---|
+| `ARWorker` (Sprite, GDNative) | — | selalu dibuat di `start()` |
+| `ARCamera` (Camera) | `auto_create_camera` | pakai Camera milik scene-mu (dicari otomatis) |
+| `VideoQuad` (MeshInstance) | `video_enabled`, `video_distance` | tampilkan video sendiri (mis. `TextureRect` 2D) |
+| Label status | `status_label_path` (NodePath) | **kosong = tetap jalan**; status hanya lewat sinyal `status_changed` |
+
+Jadi untuk scene 3D paling minimal: `Spatial` root + node `ARSession` +
+node `ARMarkerSpawner` → **Camera dan video jadi sendiri**. Tambahkan node
+`Label` lalu seret ke `status_label_path` (di ARSession maupun ARSpawner)
+hanya bila ingin lihat status; dikosongkan tidak error.
+
+### 3b. Contoh skrip sendiri (tanpa ARSpawner)
+
+Bila ingin logika sendiri, hubungkan ke node `ARSession` (bukan autoload):
+
 ```gdscript
 extends Spatial
 
-var _tex: ImageTexture
-var _quad: MeshInstance
+var _ar: ARSession
 var _cube: MeshInstance
 
 func _ready():
-    _tex = ImageTexture.new()
-    AR.connect("frame_updated", self, "_on_frame")
-    AR.connect("marker_detected", self, "_on_markers")
-    AR.connect("marker_lost", self, "_on_lost")
-    AR.connect("status_changed", self, "_on_status")
-    AR.start()
-    $Camera.fov = rad2deg(2.0 * atan(480.0 / (2.0 * (0.9 * 640.0))))  # ~45
+    # Cara 1: node ARSession sudah ada di scene -> ambil
+    # Cara 2: buat dari kode (semua node pendukung ikut otomatis)
+    _ar = ARSession.new()
+    add_child(_ar)               # auto_start=true -> kamera + video quad nyala
+    _ar.connect("marker_detected", self, "_on_markers")
+    _ar.connect("marker_lost", self, "_on_lost")
+
     _cube = MeshInstance.new()
     var box := BoxMesh.new()
     box.size = Vector3(0.05, 0.05, 0.05)
@@ -113,134 +130,98 @@ func _ready():
     _cube.visible = false
     add_child(_cube)
 
-func _on_frame(image):
-    if image == null:
-        return
-    _tex.create_from_image(image)
-    if _quad == null:
-        _quad = _make_video_quad($Camera, _tex)
-
-func _on_markers(ids, translations, rotations):
+# CATATAN: sinyal ARSession mengirim 3 argumen (tanpa node), beda dgn sinyal C++
+# yang mengirim 4 argumen (node, ids, translations, rotations).
+func _on_markers(ids: Array, translations: Array, rotations: Array) -> void:
     if ids.empty():
         _cube.visible = false
         return
     var t: Vector3 = translations[0]
     _cube.translation = Vector3(t.x, -t.y, -t.z)
-    _cube.transform.basis = AR.basis_from_rvec(rotations[0])
+    _cube.transform.basis = ARSession.basis_from_rvec(rotations[0])
     _cube.visible = true
-    $StatusLabel.text = AR.status_text()
 
-func _on_lost():
+func _on_lost() -> void:
     _cube.visible = false
-
-func _on_status(text):
-    $StatusLabel.text = text
-
-func _make_video_quad(cam: Camera, tex: Texture) -> MeshInstance:
-    var dist := 1.0
-    var hh := dist * tan(deg2rad(cam.fov * 0.5))
-    var hw := hh * (640.0 / 480.0)
-    var q := QuadMesh.new()
-    q.size = Vector2(hw * 2.0, hh * 2.0)
-    var m := SpatialMaterial.new()
-    m.flags_unshaded = true
-    m.albedo_texture = tex
-    m.emission_enabled = true
-    m.emission = Color(1, 1, 1)
-    m.emission_texture = tex
-    var mi := MeshInstance.new()
-    mi.mesh = q
-    mi.set_surface_material(0, m)
-    cam.add_child(mi)
-    mi.translation = Vector3(0, 0, -dist)
-    return mi
 ```
+
+Bila salah satu tanda tangan tidak cocok, editor mengeluarkan:
+`emit_signal: Error calling method from signal ... Method expected 4 arguments, but called with 3`
+— artinya handler masih memakai bentuk sinyal C++ (`node` di depan).
+Perbaiki dengan membuang argumen pertama `_node`.
 
 Kenapa quad, bukan `TextureRect` fullscreen: Control selalu digambar DI ATAS
 3D dalam satu viewport sehingga menutupi model. Quad punya depth yang benar.
-Ganti `AR` jadi `_ar` (node) di contoh tersebut — pola koneksi sama, cuma
-sumbernya node `ARSession`, bukan autoload.
-
-
+Di scene 2D, node 3D milik ARSession tidak ter-render sehingga tidak mengganggu.
 ---
 
-## 4. Membuat `ARSession` dari kode (bila tak mau tambah node manual)
+## 4. Scene 2D (debug video saja)
 
-```gdscript
-func _ready():
-    var ar := ARSession.new()
-    ar.capture_width = 640
-    ar.capture_height = 480
-    ar.marker_length = 0.05
-    add_child(ar)  # auto_start=true -> kamera langsung nyala
-    ar.connect("marker_detected", self, "_on_markers")
-
-func _on_markers(ids, translations, rotations):
-    if ids.empty():
-        return
-    var t: Vector3 = translations[0]
-    $Cube.translation = Vector3(t.x, -t.y, -t.z)
-    $Cube.transform.basis = ARSession.basis_from_rvec(rotations[0])
-```
-
-Kenapa `class_name` wajib di tiap script: itu yang membuat `ARSession.new()`
-dan node "Add Node → ARSession" tersedia di editor tanpa path file.
-
-## 5. Bila tetap ingin autoload (opsional)
-
-1. Project Settings → Autoload → `res://global/ar.gd`, nama `AR`, Enabled.
-2. Di skrip: `const AR := get_node("/root/AR")`, atau pakai `class_name`.
-3. JANGAN jalankan autoload + node ARSession sekaligus (2 kamera = berat).
-
-## 6. ARMarkerSpawner — scene objek per ID (tanpa sentuh ArUco)
-
-Root `Control` + `TextureRect webcamView` + `Label StatusLabel`, script:
+Root `Control` + `TextureRect webcamView` + `Label StatusLabel`; sesi AR dibuat
+dari kode (node 3D milik ARSession tidak ter-render di scene 2D, aman):
 
 ```gdscript
 extends Control
+
 var _tex: ImageTexture
+var _ar: ARSession
+
 func _ready():
     _tex = ImageTexture.new()
-    AR.connect("frame_updated", self, "_on_frame")
-    AR.connect("marker_detected", self, "_on_markers")
-    AR.start()
+    _ar = ARSession.new()
+    _ar.video_enabled = false  # 2D pakai TextureRect sendiri, bukan VideoQuad
+    add_child(_ar)
+    _ar.connect("frame_updated", self, "_on_frame")
+    _ar.connect("marker_detected", self, "_on_markers")
+    _ar.connect("status_changed", self, "_on_status")
+
 func _on_frame(image):
     if image == null:
         return
     _tex.create_from_image(image)
     $webcamView.texture = _tex
-func _on_markers(ids, _t, _r):
+
+func _on_markers(ids: Array, _t: Array, _r: Array) -> void:
     if ids.empty():
         $StatusLabel.text = "Menunggu marker..."
     else:
         $StatusLabel.text = "Marker ID: %s" % str(ids[0])
+
+func _on_status(text: String) -> void:
+    $StatusLabel.text = text
 ```
 
----
+Kenapa `class_name` wajib di tiap script: itulah yang membuat `ARSession.new()`
+serta entri "Add Node → ARSession" tersedia tanpa menulis path file.
 
 ## 5. Migrasi scene lama (Main2D / Main3D)
 
-- `MainAR.gd` / `Main2D.gd` yang ada **tetap jalan** (membawa worker sendiri)
-  — tidak wajib diubah.
-- Bila ingin migrasi ke autoload: hapus node worker (`Sprite`/`ARWorker`)
-  dari `.tscn` + hapus koneksi sinyalnya di editor, lalu hubungkan script ke
-  sinyal `AR` seperti contoh di atas. Jangan jalankan worker ganda
-  (2 `VideoCapture` = berat); pilih satu pola per scene.
-- `MainAR.gd` sudah berisi pola matang (grace-frames `hold_frames`,
-  `max_jump`, `smooth_factor`/`smooth_rot`, warna per ID, `model_scenes`) —
-  salin pola itu bila scene barumu butuh stabilisasi/multi-model.
-
----
+- `MainAR.gd` / `Main2D.gd` yang ada **tetap jalan** (memakai worker C++ via
+  koneksi sinyal di editor) — tidak wajib diubah.
+- Perbedaan tanda tangan sinyal yang perlu diingat:
+  - Sinyal **C++** (`gd_opencv.gdns`): `frame_updated(node, image)`,
+    `marker_detected(node, ids, translations, rotations)` → handler butuh 4 argumen.
+  - Sinyal **ARSession**: `frame_updated(image)`,
+    `marker_detected(ids, translations, rotations)` → handler butuh 3 argumen.
+- Bila ingin migrasi ke node ARSession: hapus node worker (`Sprite`/`ARWorker`)
+  dari `.tscn` beserta koneksinya, ganti dengan node `ARSession`
+  (+ `ARMarkerSpawner` bila ingin). Jangan jalankan worker ganda dalam satu scene
+  (2 `VideoCapture` = berat).
+- `MainAR.gd` tetap rujukan pola matang (grace-frames, `max_jump`, smoothing
+  terpisah, warna per ID) — semua itu sudah ada di `ARMarkerSpawner`.
 
 ## 6. Troubleshooting
 
 | Gejala | Penyebab umum | Perbaikan |
 |---|---|---|
-| `Invalid get index 'AR'` | Autoload belum didaftarkan | Ulangi bagian 1, pastikan Enabled |
-| Layar hitam, tanpa log `[AR]` | `AR.start()` gagal / `.so` lama | Cek `res://bin/gd_opencv.gdns` ada, rebuild `.so`, restart editor |
-| `PEMROSESAN NONAKTIF` | `show_processed=false` | `AR.set_show_processed(true)` |
-| Kubus meleset dari marker | FOV kamera beda dgn fx OpenCV | Pakai rumus bagian 3 (~45° utk 640x480) |
-| Kubus kedip | Deteksi kedip (glare layar HP) | Tiru grace-frames `MainAR.gd` (`hold_frames=12`) |
-| 2 kamera terbuka | Worker lama + autoload jalan bersamaan | Hapus salah satunya (bagian 5) |
+| `Identifier "ARSession" not declared` | `class_name` belum terbaca | Restart editor (scan class global) |
+| `Identifier "ARMarkerSpawner" not declared` | idem | Restart editor; cek file `ar_marker_spawner.gd` ada |
+| `emit_signal: ... expected 4 arguments, but called with 3` | Handler masih bentuk sinyal C++ (`_node` di depan) | Buang argumen `_node` → `_on_markers(ids, translations, rotations)` |
+| `error 146: signature doesn't match the parent` | Nama fungsi bentrok method bawaan (`get_index`, `get_name`, …) | Ganti nama, mis. `get_marker_index()` |
+| Marker tak memunculkan apa pun | `marker_map` kosong / ID salah / `fallback_cube` off | Isi `marker_map` (atau `add_marker(7, load(...))`); coba `fallback_cube=true` |
+| Layar hitam, tanpa log `[AR]` | Sesi belum jalan / `.so` lama | `auto_start=true`; cek `gd_opencv.gdns`, rebuild `.so`, restart editor |
+| `PEMROSESAN NONAKTIF` | `show_processed=false` | Set `show_processed=true` di node ARSession |
+| Kubus meleset dari marker | FOV kamera beda dgn fx OpenCV | `ARSession` menyetel FOV otomatis (~45° utk 640×480); jangan timpa manual |
+| Kubus kedip | Deteksi kedip (glare layar HP) | `hold_frames=12` (default ARSpawner) |
+| 2 kamera terbuka | Worker lama + ARSession jalan bersamaan | Hapus salah satunya (bagian 5) |
 
-(Lanjut ke bagian 2: scene 2D, migrasi, troubleshooting.)

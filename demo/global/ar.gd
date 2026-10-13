@@ -24,6 +24,10 @@ var capture_height: int = 480
 var show_processed: bool = true
 var marker_length: float = 0.05
 export var auto_start: bool = true  # kamera nyala saat masuk scene
+export var auto_create_camera: bool = true  # buat Camera sendiri bila scene tak punya
+export var video_enabled: bool = true  # gambar frame kamera sebagai background 3D
+export var video_distance: float = 1.0  # jarak quad video di depan kamera (meter)
+export var status_label_path: NodePath  # opsional; kosong = status hanya via sinyal
 
 # Cache hasil frame terakhir (siap dibaca kapan pun via getter).
 var last_ids: Array = []
@@ -34,12 +38,90 @@ var last_seen_msec: int = 0
 var _worker: Node = null  # GDOpenCVExample (Sprite) buatan C++
 var _was_empty: bool = true
 var _video_tex: ImageTexture
+var _camera: Camera
+var _video_quad: MeshInstance
 
 
 func _ready() -> void:
 	_video_tex = ImageTexture.new()
+	_ensure_camera()
 	if auto_start:
 		start()
+
+
+# --- Node pendukung AR (dibuat sendiri, tidak perlu setup manual) ----------
+func _ensure_camera() -> void:
+	_camera = _find_camera()
+	if _camera == null and auto_create_camera:
+		_camera = Camera.new()
+		_camera.name = "ARCamera"
+		add_child(_camera)
+	if _camera == null:
+		push_warning("[ARSession] Kamera tidak ditemukan dan auto_create_camera dinonaktifkan.")
+		return
+	_camera.current = true
+	_sync_camera_fov()
+
+
+func _find_camera() -> Camera:
+	var root := get_tree().current_scene
+	if root == null:
+		return null
+	return _find_camera_recursive(root)
+
+
+func _find_camera_recursive(n: Node) -> Camera:
+	if n is Camera:
+		return n as Camera
+	for c in n.get_children():
+		var found := _find_camera_recursive(c)
+		if found != null:
+			return found
+	return null
+
+
+# Samakan FOV kamera dgn fx OpenCV (0.9*width) agar objek pas di atas marker
+# pada video. Tanpa ini pose benar tapi terlihat meleset.
+func _sync_camera_fov() -> void:
+	if _camera == null or capture_width <= 0 or capture_height <= 0:
+		return
+	var fx := 0.9 * float(capture_width)
+	_camera.fov = rad2deg(2.0 * atan(float(capture_height) / (2.0 * fx)))
+
+
+# Kenapa quad, bukan TextureRect fullscreen: elemen Control selalu digambar DI
+# ATAS 3D dalam satu viewport sehingga menutupi objek. Quad punya depth benar.
+# Di scene 2D node 3D ini tidak ter-render (tidak mengganggu).
+func _ensure_video_quad() -> void:
+	if _camera == null:
+		return
+	if _video_quad != null and is_instance_valid(_video_quad):
+		return
+	var half_h := video_distance * tan(deg2rad(_camera.fov * 0.5))
+	var half_w := half_h * (float(capture_width) / float(max(capture_height, 1)))
+	var quad := QuadMesh.new()
+	quad.size = Vector2(half_w * 2.0, half_h * 2.0)
+	var mat := SpatialMaterial.new()
+	mat.flags_unshaded = true
+	mat.albedo_texture = _video_tex
+	mat.emission_enabled = true
+	mat.emission = Color(1, 1, 1)
+	mat.emission_texture = _video_tex
+	var mi := MeshInstance.new()
+	mi.name = "VideoQuad"
+	mi.mesh = quad
+	mi.set_surface_material(0, mat)
+	_camera.add_child(mi)
+	mi.translation = Vector3(0, 0, -video_distance)
+	_video_quad = mi
+
+
+func get_camera() -> Camera:
+	return _camera
+
+
+func get_video_quad() -> MeshInstance:
+	return _video_quad
 
 
 # --- Kontrol kamera -------------------------------------------------------
@@ -49,13 +131,34 @@ func start() -> bool:
 	if not ResourceLoader.exists(GDNS_PATH):
 		_set_status("GDNative tidak ketemu: " + GDNS_PATH)
 		return false
-	var gdns: NativeScript = load(GDNS_PATH) as NativeScript
+	var resource = load(GDNS_PATH)
+	if resource == null or not (resource is NativeScript):
+		_set_status("Resource GDNative gagal dimuat atau bukan NativeScript: " + GDNS_PATH)
+		return false
+
+	var gdns: NativeScript = resource as NativeScript
 	_worker = gdns.new()
+	if _worker == null:
+		_set_status("Gagal membuat instance worker GDNative.")
+		return false
+
 	_worker.name = "ARWorker"
 	_apply_config()
 	add_child(_worker)
-	_worker.connect("frame_updated", self, "_on_worker_frame")
-	_worker.connect("marker_detected", self, "_on_worker_markers")
+	if not _worker.has_signal("frame_updated") or not _worker.has_signal("marker_detected"):
+		_worker.queue_free()
+		_worker = null
+		_set_status("Worker GDNative tidak menyediakan sinyal frame_updated/marker_detected.")
+		return false
+
+	var frame_err = _worker.connect("frame_updated", self, "_on_worker_frame")
+	var marker_err = _worker.connect("marker_detected", self, "_on_worker_markers")
+	if frame_err != OK or marker_err != OK:
+		_worker.queue_free()
+		_worker = null
+		_set_status("Gagal menghubungkan sinyal worker GDNative.")
+		return false
+
 	_set_status("AR aktif. Menunggu marker DICT_4X4_50...")
 	return true
 
@@ -109,6 +212,8 @@ func _apply_config() -> void:
 func _on_worker_frame(_node, image) -> void:
 	if image != null:
 		_video_tex.create_from_image(image)
+		if video_enabled:
+			_ensure_video_quad()
 	emit_signal("frame_updated", image)
 
 
@@ -185,4 +290,9 @@ func status_text() -> String:
 
 
 func _set_status(text: String) -> void:
+	# Status selalu lewat sinyal; label opsional (kosong = tetap jalan).
 	emit_signal("status_changed", text)
+	if status_label_path != NodePath(""):
+		var lbl := get_node_or_null(status_label_path)
+		if lbl != null and lbl is Label:
+			lbl.text = text

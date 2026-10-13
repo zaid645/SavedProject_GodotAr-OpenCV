@@ -5,11 +5,18 @@
 
 [node name="try1" type="Spatial"]
 
-[node name="Camera" type="Camera" parent="."]
-
 [node name="ARMarkerSpawner" type="Spatial" parent="."]
 script = ExtResource( 1 )
+auto_create_session = null
 session_node = NodePath("../ARSession")
+marker_map = null
+smooth_factor = null
+smooth_rot = null
+hold_frames = null
+max_jump = null
+marker_length = null
+fallback_cube = null
+status_label_path = null
 
 [node name="ARSession" type="Node" parent="."]
 script = ExtResource( 2 )

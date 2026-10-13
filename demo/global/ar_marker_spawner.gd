@@ -79,7 +79,7 @@ func _find_session_recursive(n: Node) -> ARSession:
 
 
 
-func _on_markers(_node, ids: Array, translations: Array, rotations: Array) -> void:
+func _on_markers(ids: Array, translations: Array, rotations: Array) -> void:
 	if ids.empty():
 		_tick_missed({})
 		return

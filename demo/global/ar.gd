@@ -1,9 +1,13 @@
 extends Node
-# AR — autoload pusat kamera + deteksi marker ArUco.
-# Daftarkan manual: Project Settings > Autoload > Name "AR" > Path res://global/ar.gd
-# (lihat IMPLEMENTATION_AR.MD). Scene baru cukup dengar sinyal AR, tanpa ARWorker sendiri.
+class_name ARSession
+# AR — NODE (bukan autoload): tambahkan sendiri ke scene yang butuh AR.
+# Aturan lokal proyek: script yg memakai extends_node WAJIB class_name agar
+# bisa dibuat lewat add_child(). Lihat IMPLEMENTATION_AR.MD.
 #
-# Arsitektur: GDNative worker (gd_opencv.gdns) -> AR (re-emit) -> scene mana pun.
+# Cukup taruh 1 node ARSession di scene (atau instansiasi dari kode via
+# ARSession.new()). Node ARSpawner terpisah akan mencari node ini otomatis.
+#
+# Arsitektur: GDNative worker (gd_opencv.gdns) -> ARSession -> scene/ARSpawner.
 # Fokus utama scene 3D; scene 2D bisa pakai sinyal frame_updated yang sama.
 
 signal frame_updated(image)
@@ -19,7 +23,7 @@ var capture_width: int = 640
 var capture_height: int = 480
 var show_processed: bool = true
 var marker_length: float = 0.05
-var auto_start: bool = true
+export var auto_start: bool = true  # kamera nyala saat masuk scene
 
 # Cache hasil frame terakhir (siap dibaca kapan pun via getter).
 var last_ids: Array = []

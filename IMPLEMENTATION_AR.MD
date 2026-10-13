@@ -13,24 +13,31 @@ GDNative worker (C++) --frame_updated/marker_detected--> AR (autoload)
 
 ---
 
-## 1. Daftarkan autoload (sekali per proyek, manual di editor)
+## 1. Ganti pendekatan: Node, bukan autoload
 
-> `project.godot` SENGAJA tidak diubah via kode — lakukan sekali di editor:
+`AR` **tidak lagi jadi autoload global**. Sekarang ia sebuah **node** yang kamu
+tambahkan sendiri ke scene yang membutuhkan AR:
 
-1. Godot 3.x → **Project → Project Settings → tab Autoload**.
-2. **Path**: `res://global/ar.gd`, **Node Name**: `AR` → **Add** → pastikan
-   kolom Enabled tercentang.
-3. **OK / Close** → `project.godot` otomatis mendapat bagian `[autoload]`.
-4. Restart editor bila perlu. Tes cepat: di scene mana pun,
-   `print(AR.is_running())` tidak error "Invalid get index 'AR'".
+- `ar.gd` → `class_name ARSession` (pemrosesan kamera + deteksi marker).
+- `ar_marker_spawner.gd` → `class_name ARMarkerSpawner` (spawn objek per ID).
 
-Konfigurasi default di `ar.gd` (bisa diubah dari Inspector autoload/kode):
+Kenapa node, bukan autoload:
+
+| | Node `ARSession` (kini) | Autoload `AR` (lama) |
+|---|---|---|
+| Ruang lingkup | Hanya scene yg punya node itu | Seluruh aplikasi |
+| Cocok untuk | **Scene tertentu** (rekomendasimu) | AR di mana-mana tanpa setup |
+| Cara pakai | Taruh node / `add_child(ARSession.new())` | Daftar sekali di Project Settings |
+| Banyak scene AR | 1 sesi per scene (kamera mati saat keluar) | 1 sesi global (perlu `stop()` saat pindah) |
+
+Dengan node, scene non-AR sama sekali tidak tersentuh — sesuai keinginanmu.
+(Bila nanti ingin tetap memakai autoload, lihat bagian 5.)
+
+Konfigurasi default di `ARSession` (bisa diubah dari Inspector):
 `camera_id=0`, `640x480`, `show_processed=true`, `marker_length=0.05`,
 `auto_start=true`.
 
----
-
-## 2. Sinyal & API yang disediakan `AR`
+## 2. Sinyal & API yang disediakan `ARSession`
 
 | Sinyal | Argumen | Kapan dipancarkan |
 |---|---|---|
@@ -39,23 +46,44 @@ Konfigurasi default di `ar.gd` (bisa diubah dari Inspector autoload/kode):
 | `marker_lost` | `()` | Sekali saat transisi terlihat → hilang total |
 | `status_changed` | `(text: String)` | Perubahan status internal AR |
 
-Fungsi penting: `AR.start()` / `AR.stop()` / `AR.is_running()`,
-`AR.set_camera_id(n)`, `AR.set_marker_length(m)`,
-`AR.get_video_texture()`, `AR.has_marker(id)`,
-`AR.get_marker_position(id)` (sudah konversi sumbu OpenCV→Godot),
-`AR.get_marker_basis(id)`, `AR.get_marker_tilt_deg(id)`,
-`AR.status_text()`, `AR.basis_from_rvec(r)` (static).
+Fungsi penting: `start()` / `stop()` / `is_running()`,
+`set_camera_id(n)`, `set_show_processed(v)`, `set_marker_length(m)`,
+`get_video_texture()`, `has_marker(id)`,
+`get_marker_position(id)` (sudah konversi sumbu OpenCV→Godot),
+`get_marker_basis(id)`, `get_marker_tilt_deg(id)`,
+`status_text()`, `basis_from_rvec(r)` (static).
 
 Aturan ID: `id = -1` = "marker pertama / apa saja";
 `id >= 0` = ID ArUco spesifik (untuk multi-model).
 
----
+## 3. Model pemakaian: `ARSession` + `ARMarkerSpawner` (paling cepat)
 
-## 3. Scene 3D minimal (yang disarankan)
+Dua file utama (sama-sama `class_name`, BUKAN autoload):
 
-Struktur scene baru (contoh `Arena3D.tscn`): root `Spatial` + script sendiri
-+ `Camera` + `Label StatusLabel`. **Tidak perlu** node `ARWorker`/`Sprite`/
-`webcamView` lagi — kamera dipegang autoload.
+| File | class_name | Peran |
+|---|---|---|
+| `demo/global/ar.gd` | `ARSession` | Pemrosesan AR: kamera + deteksi marker. Taruh 1x per scene. |
+| `demo/global/ar_marker_spawner.gd` | `ARMarkerSpawner` | Memunculkan scene objek sesuai ID marker. Node terpisah; tidak tahu soal GDNative. |
+
+Langkah manual (TIDAK ada scene otomatis — ini memang konsepmu):
+
+1. Scene 3D baru: root `Spatial` + `Camera` + (opsional) `Label StatusLabel`.
+2. Tambahkan node **`ARSession`** (ketik di Add Node → karena ada `class_name`,
+   atau `add_child(ARSession.new())` dari kode). `auto_start=true` → kamera nyala.
+3. Tambahkan node **`ARMarkerSpawner`**. Di Inspector:
+   - `session_node`: seret node `ARSession` tadi (boleh dikosongkan;
+     spawner mencari sendiri, `auto_create_session=true` bisa membuatnya).
+   - `marker_map` (Dictionary): **key = ID ArUco** (mis. `7`),
+     **value = PackedScene** objekmu (mis. `Kursi.tscn` — buat via
+     Scene → Save Branch as Scene).
+   - `fallback_cube = true` → ID tak ada di map tetap muncul kubus warna unik.
+   - `status_label_path` (opsional): seret node Label.
+4. Run. Marker ID 7 terlihat → `Kursi` muncul menempel di marker + ikut miring;
+   marker hilang > `hold_frames` → objek disembunyikan lalu di-free.
+
+Ya — ArUco memang "berisi ID" (DICT_4X4_50 = ID 0–49). Node `ARSpawner`
+memetakan **ID → scene objek**, persis seperti yang kamu bayangkan.
+
 
 ```gdscript
 extends Spatial
@@ -124,11 +152,41 @@ func _make_video_quad(cam: Camera, tex: Texture) -> MeshInstance:
 
 Kenapa quad, bukan `TextureRect` fullscreen: Control selalu digambar DI ATAS
 3D dalam satu viewport sehingga menutupi model. Quad punya depth yang benar.
+Ganti `AR` jadi `_ar` (node) di contoh tersebut — pola koneksi sama, cuma
+sumbernya node `ARSession`, bukan autoload.
 
 
 ---
 
-## 4. Scene 2D (debug video saja)
+## 4. Membuat `ARSession` dari kode (bila tak mau tambah node manual)
+
+```gdscript
+func _ready():
+    var ar := ARSession.new()
+    ar.capture_width = 640
+    ar.capture_height = 480
+    ar.marker_length = 0.05
+    add_child(ar)  # auto_start=true -> kamera langsung nyala
+    ar.connect("marker_detected", self, "_on_markers")
+
+func _on_markers(ids, translations, rotations):
+    if ids.empty():
+        return
+    var t: Vector3 = translations[0]
+    $Cube.translation = Vector3(t.x, -t.y, -t.z)
+    $Cube.transform.basis = ARSession.basis_from_rvec(rotations[0])
+```
+
+Kenapa `class_name` wajib di tiap script: itu yang membuat `ARSession.new()`
+dan node "Add Node → ARSession" tersedia di editor tanpa path file.
+
+## 5. Bila tetap ingin autoload (opsional)
+
+1. Project Settings → Autoload → `res://global/ar.gd`, nama `AR`, Enabled.
+2. Di skrip: `const AR := get_node("/root/AR")`, atau pakai `class_name`.
+3. JANGAN jalankan autoload + node ARSession sekaligus (2 kamera = berat).
+
+## 6. ARMarkerSpawner — scene objek per ID (tanpa sentuh ArUco)
 
 Root `Control` + `TextureRect webcamView` + `Label StatusLabel`, script:
 

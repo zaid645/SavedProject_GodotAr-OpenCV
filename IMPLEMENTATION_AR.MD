@@ -228,7 +228,7 @@ serta entri "Add Node → ARSession" tersedia tanpa menulis path file.
 | Layar hitam, tanpa log `[AR]` | Sesi belum jalan / `.so` lama | `auto_start=true`; cek `gd_opencv.gdns`, rebuild `.so`, restart editor |
 | `PEMROSESAN NONAKTIF` | `show_processed=false` | Set `show_processed=true` di node ARSession |
 | Kubus meleset dari marker | FOV kamera beda dgn fx OpenCV | `ARSession` menyetel FOV otomatis (~45° utk 640×480); jangan timpa manual |
-| Kubus kedip | Deteksi kedip (glare layar HP) | `hold_frames=12` (default ARSpawner) |
+| Kubus kedip | Deteksi kedip (glare layar HP) | `hold_frames=5` (default ARSpawner) |
 | 2 kamera terbuka | Worker lama + ARSession jalan bersamaan | Hapus salah satunya (bagian 5) |
 
 ---
@@ -291,8 +291,8 @@ sehingga posisi dan proyeksi tetap konsisten — tidak perlu menyentuh
 | Langkah | Aksi | Efek |
 |---|---|---|
 | 1 | `pose_scale` sesuai 8b | Memperbaiki ~90% kasus (skala) |
-| 2 | Turunkan `smooth_factor` ke 3–5, `smooth_rot` ke 5 | Mengurangi goyang saat kamera bergerak (tambah sedikit lag) |
-| 3 | Periksa `max_jump` (0.15 m) | Bila kubus "nyangkut" saat digerak cepat, naikkan ke 0.25 |
+| 2 | `smooth_factor=12` default (nempel); turunkan ke 5–8 bila goyang, naikkan ke 15 bila tertinggal | Menyeimbangkan lag vs jitter |
+| 3 | `max_jump=0.30` (clamp, bukan freeze) | Bila kubus tertinggal, naikkan ke 0.4 / set 0 = mati; bila teleport, turunkan ke 0.2 |
 | 4 | Kalibrasi kamera asli (`cv::calibrateCamera`, papan catur) | Perbaikan pasti `fx/fy/cx/cy` — menyusul bila 1–3 belum cukup |
 | 5 | Webcam 30 fps + rolling shutter | Bukan config: gerakan cepat memang blur; kurangi kecepatan gerak |
 

@@ -23,10 +23,10 @@ signal despawned(id)
 export var auto_create_session: bool = true
 export var session_node: NodePath  # node ARSession; kosong = cari otomatis
 export var marker_map: Dictionary = {}  # {id:int -> PackedScene}
-export var smooth_factor: float = 8.0  # lerp posisi
+export var smooth_factor: float = 12.0  # lerp posisi (naik = lebih nempel)
 export var smooth_rot: float = 8.0  # slerp rotasi
-export var hold_frames: int = 12  # toleransi kedip marker
-export var max_jump: float = 0.15  # meter; tolak lompatan pose (0 = mati)
+export var hold_frames: int = 5  # toleransi kedip marker (kecil = pose basi cepat hilang)
+export var max_jump: float = 0.30  # meter; BATAS langkah/clamp per-frame (0 = mati)
 export var marker_length: float = 0.05  # meter; untuk fallback kubus
 export var fallback_cube: bool = true  # ID tak ada di marker_map -> kubus warna unik
 export var debug_mode: bool = true  # true = tampilkan semua (termasuk kubus fallback); false = hanya scene valid
@@ -103,12 +103,18 @@ func _on_markers(ids: Array, translations: Array, rotations: Array) -> void:
 			_spawned[id] = true
 			emit_signal("spawned", id, node)
 		else:
-			if max_jump > 0.0 and node.translation.distance_to(pos) > max_jump:
-				pos = node.translation
+			# Clamp, bukan freeze: batasi langkah ke max_jump ke arah pengukuran
+			# baru agar kubus tetap mengejar marker walau tvec noise / gerak cepat.
+			var target: Vector3 = pos
+			if max_jump > 0.0:
+				var delta_p: Vector3 = target - node.translation
+				var dist: float = delta_p.length()
+				if dist > max_jump:
+					target = node.translation + delta_p / dist * max_jump
 			var wp: float = clamp(smooth_factor * get_process_delta_time(), 0.0, 1.0)
 			var wr: float = clamp(smooth_rot * get_process_delta_time(), 0.0, 1.0)
 			var b: Basis = node.transform.basis.slerp(basis, wr)
-			var p: Vector3 = node.translation.linear_interpolate(pos, wp)
+			var p: Vector3 = node.translation.linear_interpolate(target, wp)
 			node.transform = Transform(b, p)
 			node.visible = true
 	_tick_missed(seen)

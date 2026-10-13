@@ -108,7 +108,7 @@ Tidak ada node yang perlu ditambah manual — kode men-spawn sendiri:
    d. Run → ID 7 memunculkan kursi, ID 12 memunculkan mobil.
 3. **Filter ID (opsional):** Inspector → `target_id`: `-1` = semua marker,
    mis. `7` = hanya ID 7 yang ditampilkan.
-4. **Kehalusan:** `smooth_factor` 8.0 default; kecilkan bila lag,
+4. **Kehalusan:** `smooth_factor` 12.0 default; kecilkan bila lag,
    besarkan bila jitter.
 
 ## D2. Aktifkan video background di Main3D (Tahap 2 — tanpa tambah node)
@@ -126,8 +126,8 @@ perlu menambah node apa pun. Yang kamu lakukan manual:
    - `video_distance = 1.0`
    - `capture_width = 640`, `capture_height = 480`
      (samakan dengan property `width`/`height` di node `ARWorker` bila diubah).
-   - `hold_frames = 12`, `max_jump = 0.15`
-   - `smooth_factor = 8.0`, `smooth_rot = 8.0` (boleh beda: rotasi biasanya
+   - `hold_frames = 5`, `max_jump = 0.30` (clamp)
+   - `smooth_factor = 12.0`, `smooth_rot = 8.0` (boleh beda: rotasi biasanya
      butuh smoothing lebih kuat daripada posisi).
 3. Koneksi `frame_updated` ARWorker → `_on_ARWorker_frame_updated` SUDAH ada
    di scene-mu (baris connection) — biarkan, sekarang handler-nya terisi
@@ -160,7 +160,7 @@ Urutan yang diharapkan (ikuti berurutan, berhenti di yang gagal):
 | E5 | Run `Main3D` + arahkan marker | Model muncul + ikut miring, status `ID [7] \| miring N°` | Cek koneksi sinyal C.7 + `ARWorker` visible off tapi **enabled**, `marker_length` 0.05; bila tak miring, `.gd` belum tersimpan/ter-reload |
 | E5b | 2+ marker ID beda bersamaan | Tiap ID kubus sendiri warna unik; yang hilang → kubusnya hilang | Bila semua kubus sama: normal sebelum `.glb` diisi (fallback). Bila hanya 1 tampil: cek `target_id` = -1 |
 | E6 | Gerak halus | Tidak bergetar liar (`smooth_factor` 8.0, slerp rotasi) | Wajar goyang sebelum kalibrasi. Kecilkan `smooth_factor` bila lag, besarkan bila jitter |
-| E6b | Stabilisasi (Tahap 1) | Tutup marker ~0,3 dtk → kubus DIAM + status `tahan N`; tutup > ~0,5 dtk (12 frame) → hilang normal | Bila langsung hilang: `hold_frames` kekecilan → naikkan ke 20. Bila kubus teleport saat goyang: `max_jump` kekecilan → naikkan ke 0.25 |
+| E6b | Stabilisasi (Tahap 1) | Tutup marker ~0,3 dtk → kubus DIAM + status `tahan N`; tutup > ~0,5 dtk (12 frame) → hilang normal | Bila langsung hilang: `hold_frames` kekecilan → naikkan ke 20. Bila kubus tertinggal: `max_jump` kekecilan → naikkan ke 0.4 (atau 0 = mati). Logika kini clamp, bukan freeze |
 | E7 | Video background (Tahap 2) | Run `Main3D` → terlihat GAMBAR WEBCAM (bukan abu-abu) + kubus menempel di atas marker, persis framing `Main2D` | Layar hitam: `video_enabled` false / handler belum terisi (reload `.gd`). Kubus di bawah video: `webcamView` lama masih visible → OFF-kan (D2.1). Kubus meleset dari marker: `Camera.fov` dipaksa manual → biarkan kode yang set; cek `capture_width/height` cocok dgn ARWorker |
 
 ## D. Build & Jalankan (terminal, BUKAN dari icon — C++ tak berubah tahap ini)

@@ -18,11 +18,15 @@ signal status_changed(text)
 const GDNS_PATH := "res://bin/gd_opencv.gdns"
 
 # Konfigurasi — samakan dgn kebutuhan scene (cm: marker 5 cm = 0.05).
-var camera_id: int = 0
-var capture_width: int = 640
-var capture_height: int = 480
-var show_processed: bool = true
-var marker_length: float = 0.05
+export var camera_id: int = 0
+export var capture_width: int = 640
+export var capture_height: int = 480
+export var show_processed: bool = true
+export var marker_length: float = 0.05
+# Koreksi skala pose: kalikan hasil pose dgn nilai ini (1.0 = tanpa koreksi).
+# Pakai bila kubus meleset/menjauh dari marker. Lihat cara kalibrasi di
+# IMPLEMENTATION_AR.MD bagian "Kalibrasi cepat pose_scale".
+export var pose_scale: float = 1.0
 export var auto_start: bool = true  # kamera nyala saat masuk scene
 export var auto_create_camera: bool = true  # buat Camera sendiri bila scene tak punya
 export var video_enabled: bool = true  # gambar frame kamera sebagai background 3D
@@ -80,13 +84,21 @@ func _find_camera_recursive(n: Node) -> Camera:
 	return null
 
 
-# Samakan FOV kamera dgn fx OpenCV (0.9*width) agar objek pas di atas marker
-# pada video. Tanpa ini pose benar tapi terlihat meleset.
+# Samakan FOV kamera dgn fx OpenCV agar objek pas di atas marker pada video.
+# fx efektif = 0.9*width*pose_scale (pose_scale mengoreksi kesalahan skala
+# intrinsik/marker). Tanpa ini pose benar tapi terlihat meleset.
 func _sync_camera_fov() -> void:
 	if _camera == null or capture_width <= 0 or capture_height <= 0:
 		return
-	var fx := 0.9 * float(capture_width)
+	var fx := 0.9 * float(capture_width) * max(pose_scale, 0.0001)
 	_camera.fov = rad2deg(2.0 * atan(float(capture_height) / (2.0 * fx)))
+
+
+func set_pose_scale(v: float) -> void:
+	if v <= 0.0:
+		return
+	pose_scale = v
+	_sync_camera_fov()
 
 
 # Kenapa quad, bukan TextureRect fullscreen: elemen Control selalu digambar DI
@@ -218,13 +230,23 @@ func _on_worker_frame(_node, image) -> void:
 
 
 func _on_worker_markers(_node, ids: Array, translations: Array, rotations: Array) -> void:
+	# Koreksi skala pose SEKALI di sumber: semua consumer (spawner, skrip scene)
+	# menerima pose yang sudah terkoreksi, plus FOV kamera ikut menyesuaikan.
+	var corrected: Array = []
+	if pose_scale != 1.0:
+		for t in translations:
+			var v: Vector3 = t
+			corrected.append(v * pose_scale)
+	else:
+		corrected = translations
+
 	last_ids = ids
-	last_translations = translations
+	last_translations = corrected
 	last_rotations = rotations
 	if not ids.empty():
 		_was_empty = false
 		last_seen_msec = OS.get_ticks_msec()
-		emit_signal("marker_detected", ids, translations, rotations)
+		emit_signal("marker_detected", ids, corrected, rotations)
 	else:
 		if not _was_empty:
 			_was_empty = true
@@ -232,7 +254,7 @@ func _on_worker_markers(_node, ids: Array, translations: Array, rotations: Array
 		else:
 			# Tetap teruskan array kosong tiap frame agar consumer bisa
 			# hitung grace-frames sendiri (pola MainAR.gd).
-			emit_signal("marker_detected", ids, translations, rotations)
+			emit_signal("marker_detected", ids, corrected, rotations)
 
 
 # --- Query siap pakai ------------------------------------------------------
@@ -274,6 +296,12 @@ func get_marker_tilt_deg(id: int) -> float:
 	return rad2deg(acos(clamp(b.z.dot(Vector3(0, 0, 1)), -1.0, 1.0)))
 
 
+# Jarak kamera -> marker (meter), sudah termasuk koreksi pose_scale.
+# Dipakai untuk kalibrasi: bandingkan dgn jarak pengukuran nyata.
+func get_marker_distance(id: int) -> float:
+	return get_marker_position(id).length()
+
+
 static func basis_from_rvec(r: Vector3) -> Basis:
 	# rvec = axis * angle (radian, koordinat OpenCV).
 	var angle := r.length()
@@ -286,7 +314,11 @@ static func basis_from_rvec(r: Vector3) -> Basis:
 func status_text() -> String:
 	if last_ids.empty():
 		return "Menunggu marker DICT_4X4_50..."
-	return "ID %s | miring %d°" % [str(last_ids), int(round(get_marker_tilt_deg(-1)))]
+	return "ID %s | %.2f m | miring %d°" % [
+		str(last_ids),
+		get_marker_distance(-1),
+		int(round(get_marker_tilt_deg(-1)))
+	]
 
 
 func _set_status(text: String) -> void:

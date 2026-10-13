@@ -29,6 +29,7 @@ export var hold_frames: int = 12  # toleransi kedip marker
 export var max_jump: float = 0.15  # meter; tolak lompatan pose (0 = mati)
 export var marker_length: float = 0.05  # meter; untuk fallback kubus
 export var fallback_cube: bool = true  # ID tak ada di marker_map -> kubus warna unik
+export var debug_mode: bool = true  # true = tampilkan semua (termasuk kubus fallback); false = hanya scene valid
 export var status_label_path: NodePath  # Label (opsional) utk status teks
 
 var _session: ARSession
@@ -121,7 +122,13 @@ func _ensure_instance(id: int) -> Spatial:
 		var inst: Node = (marker_map[id] as PackedScene).instance()
 		if inst is Spatial:
 			node = inst
-	if node == null and fallback_cube:
+	# Mode non-debug: ID tanpa scene valid DIABAIKAN total (tak ada kubus,
+	# tak ada status) — hanya scene terdaftar yang muncul, di lokasi marker.
+	if node == null:
+		if not debug_mode:
+			return null
+		if not fallback_cube:
+			return null
 		node = _make_cube(id)
 	if node == null:
 		return null
@@ -170,14 +177,26 @@ func _all_hidden() -> bool:
 
 
 func _on_status(text: String) -> void:
+	# Mode non-debug: status hanya untuk debug, jadi label dibiarkan kosong.
+	if not debug_mode:
+		return
 	_set_status(text)
 
 
 func _set_status(text: String) -> void:
+	if not debug_mode:
+		return
 	if status_label_path != NodePath(""):
 		var lbl := get_node_or_null(status_label_path)
-		if lbl != null and "text" in lbl:
+		if lbl != null and lbl is Label:
 			lbl.text = text
+
+
+# Info jarak untuk kalibrasi pose_scale (hanya mode debug).
+func get_marker_distance(id: int = -1) -> float:
+	if _session == null:
+		return 0.0
+	return _session.get_marker_distance(id)
 
 
 # --- API pemetaan (agar tak perlu edit Dictionary manual di Inspector) -----

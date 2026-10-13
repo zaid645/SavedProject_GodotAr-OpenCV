@@ -99,6 +99,12 @@ memetakan **ID → scene objek**, persis seperti yang kamu bayangkan.
 | `ARCamera` (Camera) | `auto_create_camera` | pakai Camera milik scene-mu (dicari otomatis) |
 | `VideoQuad` (MeshInstance) | `video_enabled`, `video_distance` | tampilkan video sendiri (mis. `TextureRect` 2D) |
 | Label status | `status_label_path` (NodePath) | **kosong = tetap jalan**; status hanya lewat sinyal `status_changed` |
+| Skala pose | `pose_scale` (ARSession) | `1.0` = tanpa koreksi; lihat bagian 8 untuk kalibrasi |
+| Mode tampilan | `debug_mode` (ARSpawner) | `false` = hanya scene terdaftar; lihat bagian 7 |
+
+Perhatikan di foto uji kamu: kubus tersebar jauh ke luar padahal marker di
+tengah — itu ciri khas **kesalahan skala**, bukan smoothing. Kerjakan
+kalibrasi `pose_scale` di bagian 8 lebih dulu sebelum menurunkan smoothing.
 
 Jadi untuk scene 3D paling minimal: `Spatial` root + node `ARSession` +
 node `ARMarkerSpawner` → **Camera dan video jadi sendiri**. Tambahkan node
@@ -224,4 +230,75 @@ serta entri "Add Node → ARSession" tersedia tanpa menulis path file.
 | Kubus meleset dari marker | FOV kamera beda dgn fx OpenCV | `ARSession` menyetel FOV otomatis (~45° utk 640×480); jangan timpa manual |
 | Kubus kedip | Deteksi kedip (glare layar HP) | `hold_frames=12` (default ARSpawner) |
 | 2 kamera terbuka | Worker lama + ARSession jalan bersamaan | Hapus salah satunya (bagian 5) |
+
+---
+
+## 7. Debug mode `ARMarkerSpawner`
+
+`export var debug_mode: bool = true` mengatur seberapa "banyak bicara" spawner:
+
+| `debug_mode` | Perilaku |
+|---|---|
+| `true` (default) | Semua marker terdeteksi dapat objek; ID tak terdaftar dapat **kubus fallback** warna unik per ID; `StatusLabel` diperbarui (ID, jarak, derajat) |
+| `false` | Hanya ID yang ada di `marker_map` yang memunculkan scene-nya, di lokasi marker. ID lain **diabaikan total** (tanpa kubus, tanpa status) |
+
+Jadi mode `false` = tampilan produksi (bersih, hanya konten valid);
+mode `true` = pengembangan (semua terlihat + status). Keduanya memakai
+smoothing, grace-frames, dan pose yang sama.
+
+---
+
+## 8. Kalibrasi cepat `pose_scale` (mengatasi kubus meleset)
+
+### 8a. Gejala & penyebab
+
+Kubus melesat/menjauh dari marker (terutama saat kamera digerakkan) hampir
+selalu karena **kesalahan SKALA**, bukan smoothing. Penyebabnya dua dan
+sama-sama bersifat linear:
+
+1. **`marker_length` tidak sesuai ukuran asli.** Marker di layar HP hampir
+   pasti bukan 5 cm (biasanya 2–3 cm). Karena pose OpenCV berskala linear
+   terhadap `marker_length`, jarak hasil estimasi jadi beberapa kali lebih besar.
+2. **`fx` perkiraan** (`0.9 × width`) tidak sama dengan `fx` webcam asli.
+
+Keduanya bisa dikoreksi dengan **satu angka**: `pose_scale` di node `ARSession`.
+Apa pun penyebabnya, hasilnya identik: kalikan pose dengan `pose_scale`.
+
+### 8b. Prosedur (2 menit, tanpa alat)
+
+1. Pastikan `debug_mode = true` dan `status_label_path` menunjuk ke Label
+   (di `ARMarkerSpawner` maupun `ARSession`) → label menampilkan jarak, mis.
+   `ID [7] | 0.83 m | miring 4°`.
+2. **Ukur jarak nyata** marker ke lensa kamera dengan penggaris, mis. **0.30 m**.
+3. Baca jarak pada label, mis. `0.83 m` (terlalu besar).
+4. Hitung: `pose_scale = jarak_nyata / jarak_terbaca = 0.30 / 0.83 = 0.36`.
+5. Set `pose_scale = 0.36` di node `ARSession` (Inspector), atau dari kode:
+   `$ARSession.set_pose_scale(0.36)`.
+6. Ulangi langkah 2–5 pada jarak berbeda (mis. 0.20 m dan 0.50 m); ambil nilai
+   yang membuat label paling mendekati ukuran di kedua jarak.
+7. Cek visual: kubus kini menempel di marker walau kamera digeser.
+
+FOV kamera **ikut dikoreksi otomatis** (`fx_eff = 0.9 × width × pose_scale`),
+sehingga posisi dan proyeksi tetap konsisten — tidak perlu menyentuh
+`Camera.fov` manual.
+
+> Alternatif tanpa angka koreksi: ukur sisi hitam marker di layar (cm), lalu
+> set `marker_length` di meter (mis. 2.5 cm → `0.025`). Hasilnya setara;
+> `pose_scale` lebih praktis bila ukurannya sulit diukur tepat.
+
+### 8c. Bila masih meleset (urutan tindakan)
+
+| Langkah | Aksi | Efek |
+|---|---|---|
+| 1 | `pose_scale` sesuai 8b | Memperbaiki ~90% kasus (skala) |
+| 2 | Turunkan `smooth_factor` ke 3–5, `smooth_rot` ke 5 | Mengurangi goyang saat kamera bergerak (tambah sedikit lag) |
+| 3 | Periksa `max_jump` (0.15 m) | Bila kubus "nyangkut" saat digerak cepat, naikkan ke 0.25 |
+| 4 | Kalibrasi kamera asli (`cv::calibrateCamera`, papan catur) | Perbaikan pasti `fx/fy/cx/cy` — menyusul bila 1–3 belum cukup |
+| 5 | Webcam 30 fps + rolling shutter | Bukan config: gerakan cepat memang blur; kurangi kecepatan gerak |
+
+Catatan: getaran yang **muncul hanya saat kamera digerak cepat** sebagian besar
+adalah motion blur + latensi capture, bukan bug — `hold_frames` mencegah kubus
+hilang, `pose_scale` mencegah meleset.
+
+
 

@@ -9,6 +9,21 @@
 config_version=4
 
 _global_script_classes=[ {
+"base": "Node",
+"class": "ARImageLibrary",
+"language": "GDScript",
+"path": "res://global/ar_image_library.gd"
+}, {
+"base": "Node",
+"class": "ARImageSession",
+"language": "GDScript",
+"path": "res://global/ar_image_session.gd"
+}, {
+"base": "Spatial",
+"class": "ARImageSpawner",
+"language": "GDScript",
+"path": "res://global/ar_image_spawner.gd"
+}, {
 "base": "Spatial",
 "class": "ARMarkerSpawner",
 "language": "GDScript",
@@ -20,6 +35,9 @@ _global_script_classes=[ {
 "path": "res://global/ar.gd"
 } ]
 _global_script_class_icons={
+"ARImageLibrary": "",
+"ARImageSession": "",
+"ARImageSpawner": "",
 "ARMarkerSpawner": "",
 "ARSession": ""
 }

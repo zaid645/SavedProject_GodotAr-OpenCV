@@ -1,0 +1,13 @@
+{
+	"targets": [
+		{
+			"name": "contoh_poster",
+			"image": "res://targets/contoh_poster.png",
+			"image_path": "res://targets/contoh_poster.png",
+			"width_m": 0.20,
+			"keypoints": 0,
+			"scene": "res://models/ContohKubus.tscn",
+			"scene_path": "res://models/ContohKubus.tscn"
+		}
+	]
+}

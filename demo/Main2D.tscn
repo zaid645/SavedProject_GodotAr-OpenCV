@@ -21,7 +21,3 @@ text = "status"
 [node name="Sprite" type="Sprite" parent="."]
 visible = false
 script = ExtResource( 1 )
-show_processed = true
-
-[connection signal="frame_updated" from="Sprite" to="." method="_on_Sprite_frame_updated"]
-[connection signal="marker_detected" from="Sprite" to="." method="_on_Sprite_marker_detected"]

@@ -28,7 +28,6 @@ material/0 = SubResource( 2 )
 [node name="ARWorker" type="Sprite" parent="."]
 visible = false
 script = ExtResource( 1 )
-show_processed = true
 
 [node name="webcamView" type="TextureRect" parent="."]
 visible = false
@@ -38,6 +37,3 @@ margin_bottom = 40.0
 [node name="StatusLabel" type="Label" parent="."]
 margin_right = 40.0
 margin_bottom = 14.0
-
-[connection signal="frame_updated" from="ARWorker" to="." method="_on_ARWorker_frame_updated"]
-[connection signal="marker_detected" from="ARWorker" to="." method="_on_ARWorker_marker_detected"]
